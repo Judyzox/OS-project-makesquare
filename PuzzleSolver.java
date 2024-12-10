@@ -3,8 +3,8 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class PuzzleSolver {
 
@@ -12,31 +12,20 @@ public class PuzzleSolver {
     private final int DELAY = 300;
 
     private final Color[] pieceColors = {
-            Color.RED,
-            Color.CYAN,
-            Color.BLUE,
-            Color.ORANGE,
-            Color.YELLOW,
-            Color.GREEN,
-            Color.MAGENTA
+            Color.RED, Color.CYAN, Color.BLUE, Color.ORANGE,
+            Color.YELLOW, Color.GREEN, Color.MAGENTA
     };
 
-    public boolean solveForThread(int[][] board, List<int[][]> pieces, int threadIndex, JLabel statusLabel, JPanel boardPanel, AtomicBoolean solutionFound, Thread[] threads) {
-        if (solutionFound.get()) {
-            return false;  // If a solution is found, skip further processing
-        }
-
+    public boolean solveForThread(int[][] board, List<int[][]> pieces, int threadIndex, JLabel statusLabel, JPanel boardPanel) {
         List<int[][]> threadPieces = new ArrayList<>(pieces);
         Collections.shuffle(threadPieces);
 
-        return backtrack(board, threadPieces, 0, statusLabel, boardPanel, solutionFound, threadIndex, threads); // Pass threadIndex here
+        return backtrack(board, threadPieces, 0, statusLabel, boardPanel);
     }
 
-    private boolean backtrack(int[][] board, List<int[][]> pieces, int pieceIndex, JLabel statusLabel, JPanel boardPanel, AtomicBoolean solutionFound, int threadIndex, Thread[] threads) {
+    private boolean backtrack(int[][] board, List<int[][]> pieces, int pieceIndex, JLabel statusLabel, JPanel boardPanel) {
         if (pieceIndex == pieces.size()) {
             SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
-            solutionFound.set(true);  // Mark the solution as found
-            stopOtherThreads(threads); // Stop all other threads when a solution is found
             return true;
         }
 
@@ -45,9 +34,6 @@ public class PuzzleSolver {
 
             for (int row = 0; row < BOARD_SIZE; row++) {
                 for (int col = 0; col < BOARD_SIZE; col++) {
-                    if (solutionFound.get()) {
-                        return false;  // If solution is found, stop further processing
-                    }
                     if (canPlace(board, rotatedPiece, row, col)) {
                         placePiece(board, rotatedPiece, row, col, pieceIndex + 1);
                         SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
@@ -56,11 +42,7 @@ public class PuzzleSolver {
                             Thread.sleep(DELAY);
                         } catch (InterruptedException ignored) {}
 
-                        if (solutionFound.get()) {
-                            return false;  // If a solution was found by another thread, stop this thread
-                        }
-
-                        if (backtrack(board, pieces, pieceIndex + 1, statusLabel, boardPanel, solutionFound, threadIndex, threads)) {
+                        if (backtrack(board, pieces, pieceIndex + 1, statusLabel, boardPanel)) {
                             return true;
                         }
                         removePiece(board, rotatedPiece, row, col);
@@ -70,14 +52,6 @@ public class PuzzleSolver {
             }
         }
         return false;
-    }
-
-    public static void stopOtherThreads(Thread[] threads) {
-        for (Thread thread : threads) {
-            if (thread != null && thread.isAlive()) {
-                thread.interrupt();  // Interrupt all threads except the one that found the solution
-            }
-        }
     }
 
     private void displayBoard(int[][] board, JPanel boardPanel, JLabel statusLabel) {
@@ -148,16 +122,5 @@ public class PuzzleSolver {
             }
         }
         return rotated;
-    }
-
-    public static void stopOtherThreadsIfSolutionFound(Thread[] threads, AtomicBoolean solutionFound) {
-        // Wait for solution and stop other threads if found
-        if (solutionFound.get()) {
-            for (Thread thread : threads) {
-                if (thread != null && thread.isAlive()) {
-                    thread.interrupt();  // Gracefully interrupt threads
-                }
-            }
-        }
     }
 }
