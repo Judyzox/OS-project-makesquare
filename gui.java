@@ -2,9 +2,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class gui {
 
@@ -19,8 +18,6 @@ public class gui {
     private List<JLabel> solutionStatusLabels;
 
     private final PuzzleSolver puzzleSolver;
-    private final AtomicBoolean solutionFound;
-    private final AtomicInteger solutionThreadIndex;
 
     public gui() {
         puzzleSolver = new PuzzleSolver();
@@ -33,7 +30,7 @@ public class gui {
         frame.getContentPane().setBackground(new Color(200, 255, 200));
 
         // Left panel for inputs
-        JPanel leftPanel = new JPanel(new GridLayout(8, 2));
+        JPanel leftPanel = new JPanel(new GridLayout(8, 4));
         leftPanel.setBackground(new Color(200, 255, 200));
 
         String[] pieceLabels = {"Z", "I", "J", "L", "O", "S", "T"};
@@ -51,8 +48,8 @@ public class gui {
 
         // Solve button
         solveButton = new JButton("Solve");
-        solveButton.setBackground(Color.BLACK);
-        solveButton.setForeground(Color.WHITE);
+        solveButton.setBackground(Color.LIGHT_GRAY);
+        solveButton.setForeground(Color.black);
         solveButton.addActionListener(e -> solvePuzzle());
         leftPanel.add(new JLabel());
         leftPanel.add(solveButton);
@@ -60,18 +57,14 @@ public class gui {
 
         // Main panel for solution visualization
         mainPanel = new JPanel();
-        mainPanel.setLayout(new GridLayout(2, 3));
+        mainPanel.setLayout(new GridLayout(2, 5));
         frame.add(mainPanel, BorderLayout.CENTER);
 
         frame.setVisible(true);
-        executor = Executors.newFixedThreadPool(7);
+        executor = Executors.newFixedThreadPool(8);
 
         boardPanels = new ArrayList<>();
         solutionStatusLabels = new ArrayList<>();
-
-        // Shared flags
-        solutionFound = new AtomicBoolean(false);
-        solutionThreadIndex = new AtomicInteger(-1);
     }
 
     private void solvePuzzle() {
@@ -97,9 +90,7 @@ public class gui {
         boardPanels.clear();
         solutionStatusLabels.clear();
 
-        Thread[] threads = new Thread[4];  // Array to store the threads
-
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 8; i++) {
             final int threadIndex = i;
             JPanel boardPanel = new JPanel();
             boardPanel.setLayout(new GridLayout(BOARD_SIZE, BOARD_SIZE));
@@ -126,7 +117,7 @@ public class gui {
                 frame.repaint();
             });
 
-            threads[threadIndex] = new Thread(() -> {
+            executor.submit(() -> {
                 int[][] board = new int[BOARD_SIZE][BOARD_SIZE];
                 for (int row = 0; row < BOARD_SIZE; row++) {
                     for (int col = 0; col < BOARD_SIZE; col++) {
@@ -134,34 +125,24 @@ public class gui {
                     }
                 }
 
-                // Wait until a solution is found
-                while (!solutionFound.get()) {
-                    boolean solvedForThisThread = puzzleSolver.solveForThread(board, pieces, threadIndex, statusLabel, boardPanel, solutionFound, threads);
-
-                    SwingUtilities.invokeLater(() -> {
-                        if (solvedForThisThread && !solutionFound.get()) {
-                            solutionFound.set(true);
-                            solutionThreadIndex.set(threadIndex);
-                            statusLabel.setText("Solved");
-                            statusLabel.setBackground(new Color(34, 139, 34)); // Green color
-                            // Show message with which thread solved the puzzle
-                            JOptionPane.showMessageDialog(frame, "Thread " + (threadIndex + 1) + " solved the puzzle!");
-                        } else if (!solvedForThisThread && !solutionFound.get()) {
-                            statusLabel.setText("Not Found");
-                            statusLabel.setBackground(new Color(255, 69, 0)); // Red color
-                        }
-                    });
-
-                    // If solution is found, freeze this thread
-                    if (solutionFound.get()) {
-                        break;
+                boolean solvedForThisThread = puzzleSolver.solveForThread(board, pieces, threadIndex, statusLabel, boardPanel);
+                SwingUtilities.invokeLater(() -> {
+                    if (solvedForThisThread) {
+                        statusLabel.setText("Solved");
+                        statusLabel.setBackground(new Color(34, 139, 34)); // Green color
+                    } else {
+                        statusLabel.setText("Not Found");
+                        statusLabel.setBackground(new Color(255, 69, 0)); // Red color
                     }
-                }
+                });
             });
-
-            executor.submit(threads[threadIndex]);
         }
     }
+
+    public static void main(String[] args) {
+        new gui();
+    }
+}
 
     public static void main(String[] args) {
         new gui();
