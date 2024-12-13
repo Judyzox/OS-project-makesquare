@@ -57,7 +57,7 @@ public class gui {
 
         // Main panel for solution visualization
         mainPanel = new JPanel();
-        mainPanel.setLayout(new GridLayout(2, 5));
+        mainPanel.setLayout(new GridLayout(2, 4));
         frame.add(mainPanel, BorderLayout.CENTER);
 
         frame.setVisible(true);
@@ -138,11 +138,6 @@ public class gui {
             });
         }
     }
-
-    public static void main(String[] args) {
-        new gui();
-    }
-}
 
     public static void main(String[] args) {
         new gui();
