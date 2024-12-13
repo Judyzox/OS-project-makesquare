@@ -3,8 +3,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 public class PuzzleSolver {
 
@@ -12,18 +11,51 @@ public class PuzzleSolver {
     private final int DELAY = 300;
 
     private final Color[] pieceColors = {
-            Color.RED, Color.CYAN, Color.BLUE, Color.ORANGE,
-            Color.YELLOW, Color.GREEN, Color.MAGENTA
+            Color.RED,
+            Color.CYAN,
+            Color.BLUE,
+            Color.ORANGE,
+            Color.YELLOW,
+            Color.GREEN,
+            Color.MAGENTA
     };
 
-    public boolean solveForThread(int[][] board, List<int[][]> pieces, int threadIndex, JLabel statusLabel, JPanel boardPanel) {
-        List<int[][]> threadPieces = new ArrayList<>(pieces);
-        Collections.shuffle(threadPieces);
+    public boolean solveForThread(int[][] board, List<int[][]> pieces, int threadIndex, JLabel statusLabel, JPanel boardPanel, int timeoutSeconds) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
 
-        return backtrack(board, threadPieces, 0, statusLabel, boardPanel);
+        Callable<Boolean> task = () -> {
+            List<int[][]> threadPieces = new ArrayList<>(pieces);
+            Collections.shuffle(threadPieces);
+            return backtrack(board, threadPieces, 0, statusLabel, boardPanel);
+        };
+
+        Future<Boolean> future = executor.submit(task);
+        boolean result = false;
+
+        try {
+            result = future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Not Solved (Timeout)"));
+            future.cancel(true); // Attempt to interrupt the task
+        } catch (InterruptedException e) {
+            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Interrupted"));
+            Thread.currentThread().interrupt(); // Preserve interrupt status
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } finally {
+            executor.shutdownNow(); // Forcefully shutdown to ensure interruption
+        }
+
+        if (!result) {
+            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Not Solved"));
+        } else {
+            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Solved"));
+        }
+
+        return result;
     }
 
-    private boolean backtrack(int[][] board, List<int[][]> pieces, int pieceIndex, JLabel statusLabel, JPanel boardPanel) {
+    private boolean backtrack(int[][] board, List<int[][]> pieces, int pieceIndex, JLabel statusLabel, JPanel boardPanel) throws InterruptedException {
         if (pieceIndex == pieces.size()) {
             SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
             return true;
@@ -34,13 +66,20 @@ public class PuzzleSolver {
 
             for (int row = 0; row < BOARD_SIZE; row++) {
                 for (int col = 0; col < BOARD_SIZE; col++) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedException(); // Exit if interrupted
+                    }
+
                     if (canPlace(board, rotatedPiece, row, col)) {
                         placePiece(board, rotatedPiece, row, col, pieceIndex + 1);
                         SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
 
                         try {
                             Thread.sleep(DELAY);
-                        } catch (InterruptedException ignored) {}
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt(); // Preserve interrupt status
+                            throw e;
+                        }
 
                         if (backtrack(board, pieces, pieceIndex + 1, statusLabel, boardPanel)) {
                             return true;
