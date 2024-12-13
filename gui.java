@@ -79,13 +79,13 @@ public class gui {
 
         // Define Tetris shapes based on user input
         List<int[][]> pieces = new ArrayList<>();
-        for (int i = 0; i < pieceCounts[0]; i++) pieces.add(new int[][]{{1, 1, 0}, {0, 1, 1}}); // L-shape
-        for (int i = 0; i < pieceCounts[1]; i++) pieces.add(new int[][]{{1, 1, 1, 1}}); // Z-shape
-        for (int i = 0; i < pieceCounts[2]; i++) pieces.add(new int[][]{{0, 0, 1}, {1, 1, 1}}); // I-shape
-        for (int i = 0; i < pieceCounts[3]; i++) pieces.add(new int[][]{{1, 0, 0}, {1, 1, 1}}); // J-shape
-        for (int i = 0; i < pieceCounts[4]; i++) pieces.add(new int[][]{{1, 1}, {1, 1}}); // T-shape
+        for (int i = 0; i < pieceCounts[0]; i++) pieces.add(new int[][]{{1, 1, 0}, {0, 1, 1}}); // Z-shape
+        for (int i = 0; i < pieceCounts[1]; i++) pieces.add(new int[][]{{1, 1, 1, 1}}); // I-shape
+        for (int i = 0; i < pieceCounts[2]; i++) pieces.add(new int[][]{{0, 0, 1}, {1, 1, 1}}); // J-shape
+        for (int i = 0; i < pieceCounts[3]; i++) pieces.add(new int[][]{{1, 0, 0}, {1, 1, 1}}); // L-shape
+        for (int i = 0; i < pieceCounts[4]; i++) pieces.add(new int[][]{{1, 1}, {1, 1}}); // O-shape
         for (int i = 0; i < pieceCounts[5]; i++) pieces.add(new int[][]{{0, 1, 1}, {1, 1, 0}}); // S-shape
-        for (int i = 0; i < pieceCounts[6]; i++) pieces.add(new int[][]{{1, 1, 1}, {0, 1, 0}}); // O-shape
+        for (int i = 0; i < pieceCounts[6]; i++) pieces.add(new int[][]{{1, 1, 1}, {0, 1, 0}}); // T-shape
 
         boardPanels.clear();
         solutionStatusLabels.clear();
@@ -125,7 +125,7 @@ public class gui {
                     }
                 }
 
-                boolean solvedForThisThread = puzzleSolver.solveForThread(board, pieces, threadIndex, statusLabel, boardPanel);
+                boolean solvedForThisThread = puzzleSolver.solveForThread(board, pieces, threadIndex, statusLabel, boardPanel,20);
                 SwingUtilities.invokeLater(() -> {
                     if (solvedForThisThread) {
                         statusLabel.setText("Solved");
