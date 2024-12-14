@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PuzzleSolver {
 
@@ -20,8 +21,22 @@ public class PuzzleSolver {
             Color.MAGENTA
     };
 
+    private final ReentrantLock lock = new ReentrantLock(); // Mutex lock for shared resources
+
+    public void solveWithMultipleThreads(int[][] board, List<int[][]> pieces, JLabel statusLabel, JPanel boardPanel, int threadCount, int timeoutSeconds) {
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            int threadIndex = i + 1;
+
+            executor.submit(() -> solveForThread(board, pieces, threadIndex, statusLabel, boardPanel, timeoutSeconds));
+        }
+
+        executor.shutdown();
+    }
+
     public boolean solveForThread(int[][] board, List<int[][]> pieces, int threadIndex, JLabel statusLabel, JPanel boardPanel, int timeoutSeconds) {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ExecutorService singleExecutor = Executors.newSingleThreadExecutor();
 
         Callable<Boolean> task = () -> {
             List<int[][]> threadPieces = new ArrayList<>(pieces);
@@ -29,27 +44,42 @@ public class PuzzleSolver {
             return backtrack(board, threadPieces, 0, statusLabel, boardPanel);
         };
 
-        Future<Boolean> future = executor.submit(task);
+        Future<Boolean> future = singleExecutor.submit(task);
         boolean result = false;
 
         try {
             result = future.get(timeoutSeconds, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Not Solved (Timeout)"));
+            lock.lock();
+            try {
+                SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Not Solved (Timeout)"));
+            } finally {
+                lock.unlock();
+            }
             future.cancel(true); // Attempt to interrupt the task
         } catch (InterruptedException e) {
-            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Interrupted"));
-            Thread.currentThread().interrupt(); // Preserve interrupt status
+            lock.lock();
+            try {
+                SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Interrupted"));
+            } finally {
+                lock.unlock();
+            }
+            Thread.currentThread().interrupt(); 
         } catch (ExecutionException e) {
             e.printStackTrace();
         } finally {
-            executor.shutdownNow(); // Forcefully shutdown to ensure interruption
+            singleExecutor.shutdownNow(); 
         }
 
-        if (!result) {
-            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Not Solved"));
-        } else {
-            SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Solved"));
+        lock.lock();
+        try {
+            if (!result) {
+                SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Not Solved"));
+            } else {
+                SwingUtilities.invokeLater(() -> statusLabel.setText("Thread " + threadIndex + ": Solved"));
+            }
+        } finally {
+            lock.unlock();
         }
 
         return result;
@@ -57,7 +87,12 @@ public class PuzzleSolver {
 
     private boolean backtrack(int[][] board, List<int[][]> pieces, int pieceIndex, JLabel statusLabel, JPanel boardPanel) throws InterruptedException {
         if (pieceIndex == pieces.size()) {
-            SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
+            lock.lock();
+            try {
+                SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
+            } finally {
+                lock.unlock();
+            }
             return true;
         }
 
@@ -72,12 +107,18 @@ public class PuzzleSolver {
 
                     if (canPlace(board, rotatedPiece, row, col)) {
                         placePiece(board, rotatedPiece, row, col, pieceIndex + 1);
-                        SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
+
+                        lock.lock();
+                        try {
+                            SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
+                        } finally {
+                            lock.unlock();
+                        }
 
                         try {
                             Thread.sleep(DELAY);
                         } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt(); // Preserve interrupt status
+                            Thread.currentThread().interrupt();
                             throw e;
                         }
 
@@ -85,7 +126,13 @@ public class PuzzleSolver {
                             return true;
                         }
                         removePiece(board, rotatedPiece, row, col);
-                        SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
+
+                        lock.lock();
+                        try {
+                            SwingUtilities.invokeLater(() -> displayBoard(board, boardPanel, statusLabel));
+                        } finally {
+                            lock.unlock();
+                        }
                     }
                 }
             }
